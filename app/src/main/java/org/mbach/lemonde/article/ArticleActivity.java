@@ -14,18 +14,20 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Parcelable;
 import android.preference.PreferenceManager;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.design.widget.AppBarLayout;
-import android.support.design.widget.CollapsingToolbarLayout;
-import android.support.design.widget.Snackbar;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.CardView;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
-import android.support.v7.widget.Toolbar;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import com.google.android.material.appbar.AppBarLayout;
+import com.google.android.material.appbar.CollapsingToolbarLayout;
+import com.google.android.material.snackbar.Snackbar;
+
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.appcompat.widget.Toolbar;
 import android.text.Html;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Menu;
@@ -48,6 +50,9 @@ import com.android.volley.toolbox.Volley;
 import com.github.mikephil.charting.charts.Chart;
 import com.squareup.picasso.Picasso;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -77,13 +82,16 @@ public class ArticleActivity extends AppCompatActivity {
     private static final String STATE_RECYCLER_VIEW_POS = "STATE_RECYCLER_VIEW_POS";
     private static final String STATE_RECYCLER_VIEW = "STATE_RECYCLER_VIEW";
     private static final String STATE_ADAPTER_ITEM = "STATE_ADAPTER_ITEM";
-    private static final String ATTR_HEADLINE = "Headline";
-    private static final String ATTR_DESCRIPTION = "description";
-    private static final String ATTR_AUTHOR = "author";
+    private static final String ATTR_HEADLINE = "h1.article__title";
+    private static final String ATTR_DESCRIPTION = "p.article__desc";
+    private static final String ATTR_READ_TIME = "p.meta__reading-time";
+    private static final String ATTR_AUTHOR = "span.meta__author";
+    private static final String ATTR_DATE = "span.meta__date";
     private static final String TAG_TRUE = "vrai";
     private static final String TAG_FAKE = "faux";
     private static final String TAG_MOSTLY_TRUE = "plutot_vrai";
     private static final String TAG_FORGOTTEN = "oubli";
+    private static final String IMAGE_PREFIX = "https://img.lemde.fr/";
 
     @Nullable
     static RequestQueue REQUEST_QUEUE = null;
@@ -313,6 +321,16 @@ public class ArticleActivity extends AppCompatActivity {
         startActivity(new Intent(Intent.ACTION_VIEW, uri));
     }
 
+    public void openSource(@NonNull View view) {
+        Button button = view.findViewById(R.id.graphSource);
+        String link = button.getContentDescription().toString();
+        Uri uri;
+        if (!link.isEmpty()) {
+            uri = Uri.parse(link);
+            startActivity(new Intent(Intent.ACTION_VIEW, uri));
+        }
+    }
+
     public void goToAccount(@SuppressWarnings("unused") View view) {
         startActivity(new Intent(this, LoginActivity.class));
     }
@@ -349,16 +367,18 @@ public class ArticleActivity extends AppCompatActivity {
 
             // Article is from a hosted blog
             ArrayList<Model> items;
-            Element content = doc.getElementById("content");
-            if (content != null) {
-                items = extractBlogArticle(content);
-                setTagInHeader(R.string.blog_article, R.color.accent_complementary, Color.WHITE);
+            /// FIXME
+            /*Elements content = doc.select("section.zone--article");
+            if (content == null) {
+                items = new ArrayList<>();
+                //items = extractBlogArticle(content.first());
+                //setTagInHeader(R.string.blog_article, R.color.accent_complementary, Color.WHITE);
             } else {
                 Elements category = doc.select("div.tt_rubrique_ombrelle");
                 if (atLeastOneChild(category)) {
                     setTitle(category.text());
                 }
-                Elements articles = doc.getElementsByTag("article");
+                Elements articles = doc.getElementsByTag("section");
                 Element largeFormat = doc.getElementById("hors_format");
                 if (largeFormat != null) {
                     items = new ArrayList<>();
@@ -375,44 +395,45 @@ public class ArticleActivity extends AppCompatActivity {
                         liveFeedParser.fetchPosts(liveContainer.select("script").html());
                         setTagInHeader(R.string.live_article, R.color.accent_live, Color.WHITE);
                     }
-                } else {
-                    // Standard article
-                    items = extractStandardArticle(articles);
-                    LeMondeDB leMondeDB = new LeMondeDB(ArticleActivity.this);
-                    // Full article is restricted to paid members
-                    isRestricted = doc.getElementById("teaser_article") != null;
-                    Log.d(TAG, "articleId " + articleId);
-                    boolean hasArticle = leMondeDB.hasArticle(articleId);
-                    toggleFavIcon(hasArticle);
-                    if (isRestricted) {
-                        if (shareItem != null) {
-                            shareItem.setIcon(getResources().getDrawable(R.drawable.ic_share_black));
-                        }
-                        CollapsingToolbarLayout collapsingToolbar = findViewById(R.id.collapsing_toolbar);
-                        collapsingToolbar.setContentScrimResource(R.color.accent);
-                        collapsingToolbar.setCollapsedTitleTextColor(getResources().getColor(R.color.primary_dark));
-                        setTagInHeader(R.string.paid_article, R.color.accent, Color.BLACK);
+                } else {*/
 
-                        if (getSupportActionBar() != null) {
-                            final Drawable upArrow = getResources().getDrawable(R.drawable.ic_arrow_back_black_24dp);
-                            getSupportActionBar().setHomeAsUpIndicator(upArrow);
-                        }
+            // Standard article
+            items = extractData(doc);
+            LeMondeDB leMondeDB = new LeMondeDB(ArticleActivity.this);
+            // Full article is restricted to paid members
+            isRestricted = doc.getElementById("teaser_article") != null;
+            Log.d(TAG, "articleId " + articleId);
+            boolean hasArticle = leMondeDB.hasArticle(articleId);
+            toggleFavIcon(hasArticle);
+            if (isRestricted) {
+                if (shareItem != null) {
+                    shareItem.setIcon(getResources().getDrawable(R.drawable.ic_share_black));
+                }
+                CollapsingToolbarLayout collapsingToolbar = findViewById(R.id.collapsing_toolbar);
+                collapsingToolbar.setContentScrimResource(R.color.accent);
+                collapsingToolbar.setCollapsedTitleTextColor(getResources().getColor(R.color.primary_dark));
+                setTagInHeader(R.string.paid_article, R.color.accent, Color.BLACK);
 
-                        // Add a button before comments where the user can connect
-                        CardView connectButton = new CardView(ArticleActivity.this);
-                        items.add(new Model(Model.BUTTON_TYPE, connectButton));
-                    }
-                    // After parsing the article, start a new request for comments
-                    Element react = doc.getElementById("liste_reactions");
-                    if (react != null) {
-                        Elements dataAjURI = react.select("[^data-aj-uri]");
-                        if (atLeastOneChild(dataAjURI)) {
-                            String commentPreviewURI = Constants.BASE_URL2 + dataAjURI.first().attr("data-aj-uri");
-                            REQUEST_QUEUE.add(new StringRequest(Request.Method.GET, commentPreviewURI, commentsReceived, errorResponse));
-                        }
-                    }
+                if (getSupportActionBar() != null) {
+                    final Drawable upArrow = getResources().getDrawable(R.drawable.ic_arrow_back_black_24dp);
+                    getSupportActionBar().setHomeAsUpIndicator(upArrow);
+                }
+
+                // Add a button before comments where the user can connect
+                CardView connectButton = new CardView(ArticleActivity.this);
+                items.add(new Model(Model.BUTTON_TYPE, connectButton));
+            }
+            // After parsing the article, start a new request for comments
+            Element react = doc.getElementById("liste_reactions");
+            if (react != null) {
+                Elements dataAjURI = react.select("[^data-aj-uri]");
+                if (atLeastOneChild(dataAjURI)) {
+                    String commentPreviewURI = Constants.BASE_URL2 + dataAjURI.first().attr("data-aj-uri");
+                    REQUEST_QUEUE.add(new StringRequest(Request.Method.GET, commentPreviewURI, commentsReceived, errorResponse));
                 }
             }
+                //}
+            //}
             articleAdapter.addItems(items);
             findViewById(R.id.articleLoader).setVisibility(View.GONE);
         }
@@ -566,36 +587,114 @@ public class ArticleActivity extends AppCompatActivity {
      * one (or multiple) author(s), a date, a description, an headline, a description and a list of paragraphs.
      * Each paragraph is a block of text (comments included) or an image or an embedded tweet.
      *
-     * @param articles article to analyze
+     * @param doc article to analyze
      * @return a list of formatted content that can be nicely displayed in the recycler view.
      */
-    @NonNull
-    private ArrayList<Model> extractStandardArticle(@NonNull Elements articles) {
-        TextView headLine = new TextView(this);
-        TextView authors = new TextView(this);
-        TextView dates = new TextView(this);
-        TextView description = new TextView(this);
+    private ArrayList<Model> extractData(@NonNull Document doc) {
 
-        headLine.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_headline));
-        authors.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_authors));
-        dates.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_authors));
-        description.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_description));
+        Elements scripts = doc.getElementsByTag("script");
+        String data = null;
+        for (Element element : scripts) {
+            String html = element.html();
+            if (html.startsWith("var lmd=")) {
+                data = html;
+                break;
+            }
+        }
 
-        Element article = articles.first();
-        authors.setText(extractAttr(article, ATTR_AUTHOR));
-        dates.setText(extractDates(article));
-        shareSubject = extractAttr(article, ATTR_HEADLINE);
-        shareText = extractAttr(article, ATTR_DESCRIPTION);
-        description.setText(shareText);
-        headLine.setText(shareSubject);
 
-        ArrayList<Model> views = new ArrayList<>();
-        views.add(new Model(headLine));
-        views.add(new Model(authors));
-        views.add(new Model(dates));
-        views.add(new Model(description));
-        views.addAll(extractParagraphs(article));
-        return views;
+        ArrayList<Model> models = new ArrayList<>();
+        if (data == null) {
+            return models;
+        }
+
+        try {
+
+            int end = data.indexOf("};");
+            JSONObject json = new JSONObject(data.substring(8, end + 1));
+            Log.d(TAG, json.toString());
+
+            JSONObject context = json.getJSONObject("context");
+            JSONObject article = context.getJSONObject("article");
+            JSONArray parsedAuthors = article.optJSONArray("parsedAuthors");
+
+            TextView headLine = new TextView(this);
+            TextView authors = new TextView(this);
+            TextView dates = new TextView(this);
+            TextView description = new TextView(this);
+            TextView readTime = new TextView(this);
+
+            headLine.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_headline));
+            authors.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_authors));
+            dates.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_authors));
+            description.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_description));
+            readTime.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_description));
+
+            fromHtml(headLine, article.getString("title"));
+            fromHtml(description, article.optString("chapo"));
+            List<String> a = new ArrayList<>();
+            if (parsedAuthors != null) {
+                for (int i = 0; i < parsedAuthors.length(); i++) {
+                    JSONObject author = (JSONObject) parsedAuthors.get(i);
+                    a.add(author.getString("name"));
+                }
+            }
+            authors.setText(String.format("Par %1$s", TextUtils.join(",", a)));
+            JSONObject createdAt = article.optJSONObject("createdAt");
+            JSONObject updatedAt = article.optJSONObject("updatedAt");
+            if (createdAt != null) {
+                if (updatedAt == null) {
+                    dates.setText(String.format("Publié le %1$s", createdAt.getString("date")));
+                } else {
+                    dates.setText(String.format("Publié le %1$s, mis à jour le %2$s", createdAt.getString("date"), updatedAt.getString("date")));
+                }
+            }
+
+            readTime.setText(String.format("Lecture %1$s min.", article.optInt("readingTime", 0)));
+
+            models.add(new Model(headLine));
+            models.add(new Model(authors));
+            models.add(new Model(dates));
+            models.add(new Model(description));
+            models.add(new Model(readTime));
+
+            // Extract the rest
+            JSONArray parsedNodes = article.optJSONArray("parsedNodes");
+            if (parsedNodes != null) {
+                for (int i = 0; i < parsedNodes.length(); i++) {
+                    JSONObject parsedNode = (JSONObject) parsedNodes.get(i);
+                    JSONObject content = parsedNode.getJSONObject("content");
+                    switch (parsedNode.getString("type")) {
+                        case "text":
+                            TextView paragraph = new TextView(this);
+                            fromHtml(paragraph, content.getString("text"));
+                            if (content.getString("type").equals("heading")) {
+                                paragraph.setTypeface(Typeface.SERIF);
+                                paragraph.setPadding(0, Constants.PADDING_TOP_SUBTITLE, 0, Constants.PADDING_BOTTOM_SUBTITLE);
+                                paragraph.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_description));
+                            } else {
+                                paragraph.setPadding(0, 0, 0, Constants.PADDING_BOTTOM);
+                                paragraph.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_body));
+                            }
+                            models.add(new Model(paragraph, Model.TEXT_TYPE));
+                            break;
+                        case "media":
+                            if (content.getString("type").equals("image")) {
+                                String image = String.format("%s%s", IMAGE_PREFIX, content.getJSONObject("media").getString("cloudPath"));
+                                Log.d(TAG, image);
+                                models.add(new Model(Model.IMAGE_TYPE, image));
+                            }
+                            break;
+                    }
+
+                }
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "error", e);
+        }
+
+        //doc.select("");
+        return models;
     }
 
     /**
@@ -678,6 +777,9 @@ public class ArticleActivity extends AppCompatActivity {
      * @param html     raw string
      */
     static void fromHtml(@NonNull TextView textView, String html) {
+        if (html == null) {
+            return;
+        }
         if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
             textView.setText(Html.fromHtml(html));
         } else {
@@ -685,49 +787,9 @@ public class ArticleActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * See {@link ArticleActivity extractStandardArticle}.
-     *
-     * @param content the document to analyze
-     * @return a list of formatted content that can be nicely displayed in the recycler view.
-     */
-    @NonNull
-    private ArrayList<Model> extractBlogArticle(@NonNull Element content) {
-        TextView headLine = new TextView(this);
-        TextView dates = new TextView(this);
-
-        headLine.setTextSize(getResources().getDimension(R.dimen.article_headline));
-        dates.setTextSize(getResources().getDimension(R.dimen.article_authors));
-
-        Elements elements = content.select(".entry-title");
-        if (atLeastOneChild(elements)) {
-            headLine.setText(elements.first().text());
-        }
-
-        elements = content.select(".entry-date");
-        if (atLeastOneChild(elements)) {
-            dates.setText(elements.first().text());
-        }
-        ArrayList<Model> views = new ArrayList<>();
-        views.add(new Model(headLine));
-        views.add(new Model(dates));
-
-        elements = content.select(".entry-content");
-        if (atLeastOneChild(elements)) {
-            for (Element child : elements.first().children()) {
-                TextView textView = new TextView(this);
-                textView.setText(child.text());
-                textView.setPadding(0, 0, 0, Constants.PADDING_BOTTOM);
-                textView.setTextSize(getResources().getDimension(R.dimen.article_body));
-                views.add(new Model(textView));
-            }
-        }
-        return views;
-    }
-
     @NonNull
     private String extractAttr(@NonNull Element article, String attribute) {
-        Elements elements = article.select("[itemprop='" + attribute + "']");
+        Elements elements = article.select(attribute);
         if (elements.isEmpty()) {
             return "";
         } else {
@@ -749,137 +811,5 @@ public class ArticleActivity extends AppCompatActivity {
                     .append(dateModified.first().text());
         }
         return builder.toString();
-    }
-
-    @NonNull
-    private List<Model> extractParagraphs(@NonNull Element article) {
-        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        boolean displayTweets = sharedPreferences.getBoolean("displayTweets", false);
-
-        List<Model> p = new ArrayList<>();
-        Elements articleBody = article.select("[itemprop='articleBody']");
-        if (articleBody.isEmpty()) {
-            return p;
-        }
-        Element body = articleBody.first();
-        Elements elements = body.children();
-        for (int i = 0; i < elements.size(); i++) {
-            Element element = elements.get(i);
-            // Ignore "À lire" ("Read also") parts which don't add much information on mobile phones
-            if (element.hasClass("lire")) {
-                continue;
-            }
-
-            Elements figures = element.getElementsByTag("figure");
-            // Text or figure ?
-            if (figures.isEmpty()) {
-
-                if (element.is("div.snippet.multimedia-embed")) {
-                    // Parse graphs if possible, otherwise just ignore this multimedia snippet
-                    boolean hasGraph = !element.select("div.graphe").isEmpty();
-                    boolean hasScript = !element.select("script").isEmpty();
-                    if (hasGraph && hasScript) {
-                        GraphExtractor graphExtractor = new GraphExtractor(this, element.select("script").html());
-                        Elements hasLegend = element.select("h2.ca-heading-sub.titre");
-                        if (!hasLegend.isEmpty()) {
-                            graphExtractor.setLegend(hasLegend.first().html());
-                        }
-                        Chart graph = graphExtractor.generate();
-                        if (graph != null) {
-                            p.add(new Model(GraphExtractor.getModelType(graph), graph));
-                        }
-                    }
-                    continue;
-                }
-
-                if (element.is("blockquote.twitter-tweet")) {
-                    if (displayTweets) {
-                        TextView content = new TextView(this);
-                        fromHtml(content, element.html());
-                        Button link = new Button(this);
-                        Elements links = element.select("a[href]");
-                        if (atLeastOneChild(links)) {
-                            link.setContentDescription("https:" + links.first().attr("href"));
-                        }
-                        CardView cardView = new CardView(this);
-                        cardView.addView(content);
-                        cardView.addView(link);
-                        p.add(new Model(Model.TWEET_TYPE, cardView));
-                    }
-                    continue;
-                }
-
-                // Cleanup hyperlink and keep only the value
-                element.select("a[href]").unwrap();
-
-                // Cleanup style markup and script which should be placed on top
-                if (element.is("style")) {
-                    element.remove();
-                    continue;
-                }
-                if (element.is("script")) {
-                    element.remove();
-                    continue;
-                }
-
-                TextView t = new TextView(this);
-                fromHtml(t, element.html());
-
-                boolean hasIntertitre = element.is("h2.intertitre");
-                if (!hasIntertitre) {
-                    hasIntertitre = !element.select("h2.intertitre").isEmpty();
-                }
-
-                if (hasIntertitre) {
-                    t.setTypeface(Typeface.SERIF);
-                    t.setPadding(0, Constants.PADDING_TOP_SUBTITLE, 0, Constants.PADDING_BOTTOM_SUBTITLE);
-                    t.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_description));
-                } else {
-                    t.setPadding(0, 0, 0, Constants.PADDING_BOTTOM);
-                    t.setTextSize(TypedValue.COMPLEX_UNIT_SP, getResources().getDimension(R.dimen.article_body));
-                }
-
-                if (element.is("p.question")) {
-                    t.setTypeface(null, Typeface.BOLD);
-                }
-
-                if (element.is("h2.tag") && element.children().size() > 0) {
-                    String cssClass = element.child(0).attr("class");
-                    t.setAllCaps(true);
-                    RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                    lp.setMargins(0, 24, 0, 24);
-                    t.setLayoutParams(lp);
-                    t.setPadding(Constants.PADDING_LEFT_RIGHT_TAG, Constants.PADDING_BOTTOM, Constants.PADDING_LEFT_RIGHT_TAG, Constants.PADDING_BOTTOM);
-                    switch (cssClass) {
-                        case TAG_FAKE:
-                            t.setBackgroundColor(ContextCompat.getColor(getBaseContext(), R.color.tag_red));
-                            break;
-                        case TAG_TRUE:
-                            t.setBackgroundColor(ContextCompat.getColor(getBaseContext(), R.color.tag_green));
-                            break;
-                        case TAG_MOSTLY_TRUE:
-                            t.setBackgroundColor(ContextCompat.getColor(getBaseContext(), R.color.tag_yellow));
-                            break;
-                        case TAG_FORGOTTEN:
-                            t.setBackgroundColor(ContextCompat.getColor(getBaseContext(), R.color.tag_grey));
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                p.add(new Model(t));
-
-            } else {
-                // If image is on first position in the DOM, it's useless to display once more: it's already displayed in the toolbar
-                if (i > 0) {
-                    Element figure = figures.first();
-                    Elements images = figure.getElementsByTag("img");
-                    if (!images.isEmpty()) {
-                        p.add(new Model(Model.IMAGE_TYPE, images.first().attr("src")));
-                    }
-                }
-            }
-        }
-        return p;
     }
 }
